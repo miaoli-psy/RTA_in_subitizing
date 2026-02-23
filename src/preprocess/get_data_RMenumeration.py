@@ -1,5 +1,7 @@
 import os
 import pandas as pd
+import numpy as np
+import ast
 
 from src.common.process_dataframe import insert_new_col_from_n_cols
 
@@ -10,6 +12,14 @@ def get_resp_n(input_string):
 def get_deviaion_score(reportN, numerosity):
     return reportN - numerosity
 
+def get_avg_ecc(posis_str):
+    """ average eccentricity  across all discs."""
+    try:
+        coords = ast.literal_eval(posis_str)
+        eccentricities = [np.sqrt(x**2 + y**2) for x, y in coords]
+        return np.mean(eccentricities)
+    except:
+        return np.nan
 
 if __name__=='__main__':
     to_csv = False
@@ -41,7 +51,6 @@ if __name__=='__main__':
         'type',
         'key_resp.rt',
         'key_resp.keys',
-        'rotation_index',
         'blocks_rm.thisN',
         'rotation_index',
         'participant',
@@ -63,8 +72,14 @@ if __name__=='__main__':
                               ["reportedN", "numerosity"],
                               "deviation", get_deviaion_score)
 
+    # add col average eccentricity
+    totalData['avg_ecc'] = totalData['posis'].apply(get_avg_ecc)
+
+    # pixels to visual degrees
+    totalData['avg_ecc'] = totalData['avg_ecc'] * 0.0273
+
 
     if to_csv:
         totalData.to_csv('data_RMenumeration.csv', index = False)
-        # totalData.sample(30).to_csv('data_RMenumeration_sample30.csv', index=False)
+        totalData.sample(30).to_csv('data_RMenumeration_sample30.csv', index=False)
 
