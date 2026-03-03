@@ -23,6 +23,19 @@ df_check_age <- data %>%
 
 mean(data$age)
 
+# remove trials based on RT?
+# rt_min <- 0.015
+# rt_max <- 4
+# 
+# data <- data %>%
+#   mutate(
+#     rt_ok = !is.na(key_resp.rt) & key_resp.rt >= rt_min & key_resp.rt <= rt_max
+#   ) %>%
+#   filter(rt_ok)
+
+
+
+#====================dv plots========================
 
 data_by_subject <- data %>% 
   group_by(numerosity, type, participant, protectzonetype) %>% 
@@ -828,6 +841,7 @@ my_plot_cv
 
 # ===================LMM ==============
 
+# data clean - for model - contrast coded (type as factor)
 data_clean <- data %>%
   filter(
     !is.na(deviation),
@@ -864,6 +878,31 @@ data_clean <- data_clean %>%
     )
   )
 
+# data clean - for model - contrast coded (only eccentricity)
+
+data_clean <- data %>%
+  filter(
+    !is.na(deviation),
+    !is.na(protectzonetype),
+    !is.na(type),
+    !is.na(participant),
+    !is.na(key_resp.rt)
+  ) %>%
+  mutate(
+    participant = as.factor(participant),  
+    numerosity  = as.factor(numerosity),
+    protectzonetype = as.factor(protectzonetype)
+  )
+
+# contrast coding
+data_clean <- data_clean %>%
+  mutate(
+    arrangement_c = ifelse(protectzonetype == "radial", -0.5, 0.5)
+  )
+
+
+
+# LMM----type
 lmm_dv <- lme4::lmer(
   deviation ~ arrangement_c * numerosity + type  + (1 + arrangement_c|participant),
   data = data_clean
@@ -930,3 +969,61 @@ sjPlot::tab_model(
 
 
 emmeans::emmeans(lmm_cv, pairwise ~ protectzonetype | numerosity)
+
+
+# ==================eccentricity======================
+
+# eccentricity distribution
+my_plot_ecc <- ggplot(data, 
+                      aes(x = avg_ecc, 
+                          color = protectzonetype)) +
+  
+  geom_density(linewidth = 0.8, alpha = 0.8) +
+  
+  facet_wrap(~ numerosity, ncol = 4, 
+             labeller = labeller(numerosity = function(x) paste("Set Size", x))) +
+  
+  labs(x = "Avearge Eccentricity (°)", 
+       y = "Density",
+       color = "Arrangement") +
+  
+  theme(axis.title.x = element_text(color="black", size=14, face="bold"),
+        axis.title.y = element_text(color="black", size=14, face="bold"),
+        panel.border = element_blank(),  
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(colour = "grey"),
+        axis.text.x = element_text(size = 12, face = "bold"),
+        axis.text.y = element_text(size = 12, face = "bold"),
+        legend.title = element_text(size = 12, face = "bold"),
+        legend.text = element_text(size = 10),
+        strip.text.x = element_text(size = 12, face = "bold"))
+
+my_plot_ecc
+
+
+#-----------lmm no type be avergae eccentricity--------
+
+lmm_dv <- lme4::lmer(
+  deviation ~ arrangement_c * numerosity + avg_ecc  + (1 + arrangement_c|participant),
+  data = data_clean
+)
+
+lmm_dv2 <- lme4::lmer(
+  deviation ~ arrangement_c + numerosity + avg_ecc + (1 + arrangement_c|participant),
+  data = data_clean
+)
+
+anova(lmm_dv, lmm_dv2)
+
+summary(lmm_dv)
+
+sjPlot::tab_model(
+  lmm_dv,
+  p.style = 'scientific_stars',
+  show.se = T,
+  show.stat = T,
+  digits = 3)
+
+
