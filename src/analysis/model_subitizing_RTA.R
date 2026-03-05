@@ -3,6 +3,25 @@ library(tidyr)
 library(bbmle)  
 library(ggplot2)
 library(patchwork)
+library(ggdist)
+
+my_plot_theme <- theme(
+  axis.title.x = element_text(color = "black", size = 14, face = "bold", margin = margin(t = 10)),
+  axis.title.y = element_text(color = "black", size = 14, face = "bold", margin = margin(r = 10)),
+  axis.text.x  = element_text(size = 12, face = "bold", color = "black"),
+  axis.text.y  = element_text(size = 12, face = "bold", color = "black"),
+  axis.line    = element_line(colour = "black", linewidth = 0.8),
+  panel.border     = element_blank(),
+  panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(),
+  panel.background = element_blank(),
+  strip.text       = element_text(size = 12, face = "bold"),
+  legend.title     = element_text(size = 12, face = "bold"),
+  legend.text      = element_text(size = 10),
+  plot.title       = element_text(size = 16, face = "bold"),
+  plot.subtitle    = element_text(size = 12, color = "grey30"),
+  panel.spacing    = unit(1.5, "lines")
+)
 
 setwd("D:/OneDrive/projects/RTA_in_subitizing/src/analysis/")
 #data <- readr::read_csv(file.choose()) #D:\OneDrive\projects\numerosity_closing_gap\data\enumeration\data_RMenumeration.csv
@@ -228,7 +247,7 @@ t6 <- t.test(fit_wide$w_radial, fit_wide$w_tangential, paired = TRUE)
 t6
 
 
-# model prediction vs. observed
+# model prediction vs. observed： DV
 # For the prediction plot, we evaluate at the mean eccentricity 
 # of each condition (arrangement × set size)
 ecc_by_condition <- data_clean %>%
@@ -324,59 +343,76 @@ p_fit <- ggplot()+
     values = c("radial" = "#BB5566", 
                "tangential" = "#004488")) +
   
-  labs(x = "Set Size", y = "Deviation Score",
+  labs(x = "Set Size", 
+       y = "Deviation Score",
        title = "Full Model: Predicted (dashed/open) vs Observed (solid)",
        color = "Arrangement") +
   
-  theme(
-    axis.title.x = element_text(
-      color = "black",
-      size = 14,
-      face = "bold"
-    ),
-    axis.title.y = element_text(
-      color = "black",
-      size = 14,
-      face = "bold"
-    ),
-    panel.border = element_blank(),
-    # remove panel grid lines
-    panel.grid.major = element_blank(),
-    panel.grid.minor = element_blank(),
-    # remove panel background
-    panel.background = element_blank(),
-    # add axis line
-    axis.line = element_line(colour = "grey"),
-    # x,y axis tick labels
-    axis.text.x = element_text(angle = 0, hjust = 1, size = 12, face = "bold"),
-    axis.text.y = element_text(size = 12, face = "bold"),
-    # legend size
-    legend.title = element_text(size = 12, face = "bold"),
-    legend.text = element_text(size = 10),
-    # facet wrap title
-    strip.text.x = element_text(size = 12, face = "bold"),
-    panel.spacing = unit(1.0, "lines")
-  ) 
+  my_plot_theme
 
 p_fit
   
-my_plot_theme <- theme(
-  axis.title.x = element_text(color = "black", size = 14, face = "bold", margin = margin(t = 10)),
-  axis.title.y = element_text(color = "black", size = 14, face = "bold", margin = margin(r = 10)),
-  axis.text.x  = element_text(size = 12, face = "bold", color = "black"),
-  axis.text.y  = element_text(size = 12, face = "bold", color = "black"),
-  axis.line    = element_line(colour = "black", linewidth = 0.8),
-  panel.border     = element_blank(),
-  panel.grid.major = element_blank(),
-  panel.grid.minor = element_blank(),
-  panel.background = element_blank(),
-  strip.text       = element_text(size = 12, face = "bold"),
-  legend.title     = element_text(size = 12, face = "bold"),
-  legend.text      = element_text(size = 10),
-  plot.title       = element_text(size = 16, face = "bold"),
-  plot.subtitle    = element_text(size = 12, color = "grey30"),
-  panel.spacing    = unit(1.5, "lines")
-)
+# model prediction vs. observed： CV
+
+pred_cv <- pred_by_condition %>%
+  mutate(
+    pred_cv = sigma_n / pred_response
+  ) %>%
+  group_by(arrangement, 
+           numerosity) %>%
+  summarise(
+    pred_cv = mean(pred_cv, na.rm = TRUE),
+    .groups = 'drop'
+  )
+
+
+obs_cv <- data_clean %>%
+  group_by(participant, protectzonetype, numerosity) %>%
+  summarise(
+    mean_rep = mean(reportedN, na.rm = TRUE),
+    sd_rep   = sd(reportedN, na.rm = TRUE),
+    cv       = sd_rep / mean_rep,
+    .groups  = 'drop'
+  ) %>%
+  group_by(protectzonetype, numerosity) %>%
+  summarise(
+    obs_cv = mean(cv, na.rm = TRUE),
+    obs_cv_se = sd(cv, na.rm = TRUE) / sqrt(n()),
+    .groups = 'drop'
+  ) %>%
+  rename(arrangement = protectzonetype) %>%
+  mutate(numerosity = as.numeric(as.character(numerosity)))
+
+combined_cv <- left_join(obs_cv, pred_cv, by = c("arrangement", "numerosity"))
+
+
+p_fit_cv <- ggplot(data = combined_cv, 
+                   aes(x = numerosity,
+                       color = arrangement)) +
+  geom_point(aes(y = obs_cv), 
+             size = 4, 
+             alpha = 0.8) +
+  geom_errorbar(aes(y = obs_cv, 
+                    ymin = obs_cv - obs_cv_se, 
+                    ymax = obs_cv + obs_cv_se),
+                width = 0.1, 
+                linewidth = 0.8) +
+  geom_line(aes(y = pred_cv, 
+                group = arrangement),
+            linewidth = 1.2,
+            linetype = "dashed") +
+  geom_point(aes(y = pred_cv), 
+             shape = 0, 
+             size = 3) +
+  scale_color_manual(values = c("radial" = "#BB5566", 
+                                "tangential" = "#004488")) +
+  labs(x = "Set Size", y = "Coefficient of Variation",
+       title = "Model Validation: Predicted (dashed) vs Observed CV",
+       color = "Arrangement") +
+  my_plot_theme
+
+p_fit_cv
+
 
 # Summary Data (Mean and SE)
 param_summary <- fit_results_full %>%
@@ -558,5 +594,6 @@ p_gap_heat <- ggplot(data = gap_grid,
   theme(axis.line = element_blank())
 
 p_gap_heat
+
 
 
