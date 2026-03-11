@@ -42,3 +42,14 @@ insert_new_col(display, "close_base", "close_ecc", cal_ecc)
 
 sum_stas_far = display["far_ecc"].describe()
 sum_stas_close = display["close_ecc"].describe()
+
+cols_to_keep = [
+    "center1",
+    "center2",
+    "far_base",
+    "close_base",
+    "far_ecc",
+    "close_ecc"
+]
+
+display[cols_to_keep].to_csv("baesdiscs.csv", index=False)
