@@ -1,6 +1,9 @@
 library(dplyr)
 library(ggplot2)
 library(svglite)
+library(tidyverse)
+library(gghalves)
+
 
 setwd("D:/OneDrive/projects/RTA_in_subitizing/src/analysis/")
 #data <- readr::read_csv(file.choose()) #D:\OneDrive\projects\numerosity_closing_gap\data\enumeration\data_RMenumeration.csv
@@ -34,708 +37,52 @@ mean(data$age)
 #   filter(rt_ok)
 
 
+# add column configuration
 
-#====================dv plots========================
+data <- data %>%
+  mutate(
+    numerosity = as.numeric(numerosity),
+    type = as.character(type),
+    protectzonetype = as.character(protectzonetype),
+    
+    configuration = case_when(
+      numerosity == 3 & type == "far"   ~ "far",
+      numerosity == 3 & type == "close" ~ "close",
+      
+      numerosity == 4 & type == "far"   ~ "1+3",
+      numerosity == 4 & type == "close" ~ "3+1",
+      numerosity == 4 & type == "both"  ~ "2+2",
+      
+      numerosity == 5 & type == "far"   ~ "2+3",
+      numerosity == 5 & type == "close" ~ "3+2",
+      
+      numerosity == 6 & type == "both"  ~ "3+3",
+      
+      TRUE ~ NA_character_
+    ),
+    
+    arrangement = case_when(
+      str_to_lower(protectzonetype) %in% c("radial", "r") ~ "radial",
+      str_to_lower(protectzonetype) %in% c("tangential", "t") ~ "tangential",
+      TRUE ~ protectzonetype
+    ),
+    
+    configuration = factor(
+      configuration,
+      levels = c("far", "close", "1+3", "3+1", "2+2", "2+3", "3+2", "3+3")
+    ),
+    arrangement = factor(arrangement, levels = c("radial", "tangential"))
+  )
+
+# # check conditions
+# data %>%
+#   count(numerosity, type, configuration, sort = TRUE)
+
+
+# ----deviation and cv --------------
 
 data_by_subject <- data %>% 
-  group_by(numerosity, type, participant, protectzonetype) %>% 
-  summarise(
-    n = n(),
-    deviation = mean(deviation, na.rm = TRUE),
-    rt = mean(key_resp.rt),
-    .groups = 'drop'
-  )
-
-
-data_across_subject <- data_by_subject %>% 
-  group_by(numerosity, type, protectzonetype) %>% 
-  summarise(
-    n = n(),
-    mean_deviation = mean(deviation, na.rm = TRUE),
-    sd_deviaiton = sd(deviation, na.rm = TRUE),
-    mean_rt = mean(rt, na.rm = TRUE),
-    sd_rt = sd(rt, na.rm = TRUE),
-    
-    .groups = 'drop'
-  ) %>% 
-  mutate(
-    sem = sd_deviaiton/sqrt(n),
-    ci = sem * qt(0.975, df = n - 1),
-    sem_rt = sd_rt/sqrt(n),
-    ci_rt = sem_rt * qt(0.975, df = n - 1)
-  )
-
-
-my_plot <- ggplot() +
-  
-  geom_point(data = data_across_subject, 
-             aes(x = numerosity,
-                 y = mean_deviation,
-                 color = type,
-                 shape = protectzonetype),
-             position = position_dodge(0.5), 
-             stat = "identity", 
-             alpha = 0.8,
-             size = 5) +
-  
-  
-  geom_hline(yintercept = 0, linetype = "dashed") +
-  
-  # geom_point(data = data_by_subject, 
-  #            aes(x = numerosity,
-  #                y = deviation,
-  #                color = type,
-  #                shape = protectzonetype),
-  #            position = position_dodge(0.5), 
-  #            stat = "identity", 
-  #            alpha = 0.2,
-  #            size = 3) +
-  
-  geom_errorbar(data = data_across_subject, 
-                aes(x = numerosity,
-                    y = mean_deviation,
-                    ymin = mean_deviation - sem,
-                    ymax = mean_deviation + sem,
-                    group = interaction(protectzonetype, type)),  # Fixed column name
-                color = "black",
-                size  = 0.8,
-                width = .00,
-                position = position_dodge(0.5),
-                alpha = 0.5) +
-  
-  labs(y = "Deviation Score (DS)", x = "Set Size") +
-  
-  scale_y_continuous(limits = c(-0.9, 1))+
-  
-  
-  theme(axis.title.x = element_text(color="black", size=14, face="bold"),
-        axis.title.y = element_text(color="black", size=14, face="bold"),
-        panel.border = element_blank(),  
-        # remove panel grid lines
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        # remove panel background
-        panel.background = element_blank(),
-        # add axis line
-        axis.line = element_line(colour = "grey"),
-        # x,y axis tick labels
-        axis.text.x = element_text(size = 12, face = "bold"),
-        axis.text.y = element_text(size = 12, face = "bold"),
-        # legend size
-        legend.title = element_text(size = 12, face = "bold"),
-        legend.text = element_text(size = 10),
-        # facet wrap title
-        strip.text.x = element_text(size = 12, face = "bold"))
-
-
-my_plot
-
-# ggsave(file = "plot_ds.svg", plot = my_plot,  width = 11, height = 5, units = "in")
-
-
-my_plot_rt <- ggplot() +
-  
-  geom_point(data = data_across_subject, 
-             aes(x = numerosity,
-                 y = mean_rt,
-                 color = type,
-                 shape = protectzonetype),
-             position = position_dodge(0.5), 
-             stat = "identity", 
-             alpha = 0.8,
-             size = 5) +
-  
-  
-  # geom_hline(yintercept = 0, linetype = "dashed") +
-  
-  geom_point(data = data_by_subject, 
-             aes(x = numerosity,
-                 y = rt,
-                 color = type,
-                 shape = protectzonetype),
-             position = position_dodge(0.5), 
-             stat = "identity", 
-             alpha = 0.2,
-             size = 3) +
-  
-  geom_errorbar(data = data_across_subject, 
-                aes(x = numerosity,
-                    y = mean_deviation,
-                    ymin = mean_rt - sem_rt,
-                    ymax = mean_rt + sem_rt,
-                    group = interaction(protectzonetype, type)),  # Fixed column name
-                color = "black",
-                size  = 0.8,
-                width = .00,
-                position = position_dodge(0.5),
-                alpha = 0.5) +
-  
-  labs(y = "RT", x = "Set Size") +
-  
-  
-  theme(axis.title.x = element_text(color="black", size=14, face="bold"),
-        axis.title.y = element_text(color="black", size=14, face="bold"),
-        panel.border = element_blank(),  
-        # remove panel grid lines
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        # remove panel background
-        panel.background = element_blank(),
-        # add axis line
-        axis.line = element_line(colour = "grey"),
-        # x,y axis tick labels
-        axis.text.x = element_text(size = 12, face = "bold"),
-        axis.text.y = element_text(size = 12, face = "bold"),
-        # legend size
-        legend.title = element_text(size = 12, face = "bold"),
-        legend.text = element_text(size = 10),
-        # facet wrap title
-        strip.text.x = element_text(size = 12, face = "bold"))
-
-
-my_plot_rt
-
-
-# ---- separate for different visual field------------
-
-data_by_subject2 <- data %>% 
-  group_by(numerosity, type, participant, protectzonetype, rotation_index) %>% 
-  summarise(
-    n = n(),
-    deviation = mean(deviation, na.rm = TRUE),
-    rt = mean(key_resp.rt),
-    .groups = 'drop'
-  )
-
-
-data_across_subject2 <- data_by_subject2 %>% 
-  group_by(numerosity, type, protectzonetype, rotation_index) %>% 
-  summarise(
-    n = n(),
-    mean_deviation = mean(deviation, na.rm = TRUE),
-    sd_deviaiton = sd(deviation, na.rm = TRUE),
-    mean_rt = mean(rt, na.rm = TRUE),
-    sd_rt = sd(rt, na.rm = TRUE),
-    
-    .groups = 'drop'
-  ) %>% 
-  mutate(
-    sem = sd_deviaiton/sqrt(n),
-    ci = sem * qt(0.975, df = n - 1),
-    sem_rt = sd_rt/sqrt(n),
-    ci_rt = sem_rt * qt(0.975, df = n - 1)
-  )
-
-
-my_plot2 <- ggplot() +
-  
-  geom_point(data = data_across_subject2, 
-             aes(x = numerosity,
-                 y = mean_deviation,
-                 color = type,
-                 shape = protectzonetype),
-             position = position_dodge(0.5), 
-             stat = "identity", 
-             alpha = 0.8,
-             size = 5) +
-  
-  
-  geom_hline(yintercept = 0, linetype = "dashed") +
-  
-  geom_point(data = data_by_subject2, 
-             aes(x = numerosity,
-                 y = deviation,
-                 color = type,
-                 shape = protectzonetype),
-             position = position_dodge(0.5), 
-             stat = "identity", 
-             alpha = 0.2,
-             size = 3) +
-  
-  geom_errorbar(data = data_across_subject2, 
-                aes(x = numerosity,
-                    y = mean_deviation,
-                    ymin = mean_deviation - sem,
-                    ymax = mean_deviation + sem,
-                    group = interaction(protectzonetype, type)),  # Fixed column name
-                color = "black",
-                size  = 0.8,
-                width = .00,
-                position = position_dodge(0.5),
-                alpha = 0.5) +
-  
-  labs(y = "Deviation Score (DS)", x = "Set Size") +
-  
-  
-  theme(axis.title.x = element_text(color="black", size=14, face="bold"),
-        axis.title.y = element_text(color="black", size=14, face="bold"),
-        panel.border = element_blank(),  
-        # remove panel grid lines
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        # remove panel background
-        panel.background = element_blank(),
-        # add axis line
-        axis.line = element_line(colour = "grey"),
-        # x,y axis tick labels
-        axis.text.x = element_text(size = 12, face = "bold"),
-        axis.text.y = element_text(size = 12, face = "bold"),
-        # legend size
-        legend.title = element_text(size = 12, face = "bold"),
-        legend.text = element_text(size = 10),
-        # facet wrap title
-        strip.text.x = element_text(size = 12, face = "bold")) +
-  
-  facet_wrap(~rotation_index)
-
-
-my_plot2
-
-# ggsave(file = "plot_ds_diff_vf.svg", plot = my_plot2, width = 18, height = 14, units = "in")
-
-
-# -----upper vs. lower visual field---------------
-
-data <- data %>%
-  mutate(up_low = case_when(
-    rotation_index > 1 & rotation_index < 13      ~ "upper visual field (2-12)",
-    rotation_index> 13 & rotation_index < 25     ~ "lower visual field (14-24)",
-    rotation_index == 1 | rotation_index == 13    ~ "horizontal meridian (1 & 13)",
-    TRUE~ NA_character_ # Optional: for values outside all conditions
-  ))
-
-
-
-data_by_subject3 <- data %>% 
-  group_by(numerosity, type, participant, protectzonetype, up_low) %>% 
-  summarise(
-    n = n(),
-    deviation = mean(deviation, na.rm = TRUE),
-    rt = mean(key_resp.rt),
-    .groups = 'drop'
-  )
-
-
-data_across_subject3 <- data_by_subject3 %>% 
-  group_by(numerosity, type, protectzonetype, up_low) %>% 
-  summarise(
-    n = n(),
-    mean_deviation = mean(deviation, na.rm = TRUE),
-    sd_deviaiton = sd(deviation, na.rm = TRUE),
-    mean_rt = mean(rt, na.rm = TRUE),
-    sd_rt = sd(rt, na.rm = TRUE),
-    
-    .groups = 'drop'
-  ) %>% 
-  mutate(
-    sem = sd_deviaiton/sqrt(n),
-    ci = sem * qt(0.975, df = n - 1),
-    sem_rt = sd_rt/sqrt(n),
-    ci_rt = sem_rt * qt(0.975, df = n - 1)
-  )
-
-
-my_plot3 <- ggplot() +
-  
-  geom_point(data = data_across_subject3, 
-             aes(x = numerosity,
-                 y = mean_deviation,
-                 color = type,
-                 shape = protectzonetype),
-             position = position_dodge(0.5), 
-             stat = "identity", 
-             alpha = 0.8,
-             size = 5) +
-  
-  
-  geom_hline(yintercept = 0, linetype = "dashed") +
-  
-  geom_point(data = data_by_subject3, 
-             aes(x = numerosity,
-                 y = deviation,
-                 color = type,
-                 shape = protectzonetype),
-             position = position_dodge(0.5), 
-             stat = "identity", 
-             alpha = 0.2,
-             size = 3) +
-  
-  geom_errorbar(data = data_across_subject3, 
-                aes(x = numerosity,
-                    y = mean_deviation,
-                    ymin = mean_deviation - sem,
-                    ymax = mean_deviation + sem,
-                    group = interaction(protectzonetype, type)),  # Fixed column name
-                color = "black",
-                size  = 0.8,
-                width = .00,
-                position = position_dodge(0.5),
-                alpha = 0.5) +
-  
-  labs(y = "Deviation Score (DS)", x = "Set Size") +
-  
-  
-  theme(axis.title.x = element_text(color="black", size=14, face="bold"),
-        axis.title.y = element_text(color="black", size=14, face="bold"),
-        panel.border = element_blank(),  
-        # remove panel grid lines
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        # remove panel background
-        panel.background = element_blank(),
-        # add axis line
-        axis.line = element_line(colour = "grey"),
-        # x,y axis tick labels
-        axis.text.x = element_text(size = 12, face = "bold"),
-        axis.text.y = element_text(size = 12, face = "bold"),
-        # legend size
-        legend.title = element_text(size = 12, face = "bold"),
-        legend.text = element_text(size = 10),
-        # facet wrap title
-        strip.text.x = element_text(size = 12, face = "bold")) +
-  
-  facet_wrap(~up_low)
-
-
-my_plot3
-
-# ggsave(file = "plot_ds_uplow.svg", plot = my_plot3, width = 12, height = 5, units = "in")
-
-
-# -----left vs. right visual field---------------
-
-data <- data %>%
-  mutate(left_right = case_when(
-    rotation_index > 7 & rotation_index < 19      ~ "left visual field (8-18)",
-    rotation_index> 0 & rotation_index < 7     ~ "right visual field (1-6,20-24)",
-    rotation_index> 19 & rotation_index < 25     ~ "right visual field (1-6,20-24)",
-    rotation_index == 7 | rotation_index == 19    ~ "vertical meridian (7 & 19)",
-    TRUE~ NA_character_ # Optional: for values outside all conditions
-  ))
-
-
-
-data_by_subject4 <- data %>% 
-  group_by(numerosity, type, participant, protectzonetype, left_right) %>% 
-  summarise(
-    n = n(),
-    deviation = mean(deviation, na.rm = TRUE),
-    rt = mean(key_resp.rt),
-    .groups = 'drop'
-  )
-
-
-data_across_subject4 <- data_by_subject4 %>% 
-  group_by(numerosity, type, protectzonetype, left_right) %>% 
-  summarise(
-    n = n(),
-    mean_deviation = mean(deviation, na.rm = TRUE),
-    sd_deviaiton = sd(deviation, na.rm = TRUE),
-    mean_rt = mean(rt, na.rm = TRUE),
-    sd_rt = sd(rt, na.rm = TRUE),
-    
-    .groups = 'drop'
-  ) %>% 
-  mutate(
-    sem = sd_deviaiton/sqrt(n),
-    ci = sem * qt(0.975, df = n - 1),
-    sem_rt = sd_rt/sqrt(n),
-    ci_rt = sem_rt * qt(0.975, df = n - 1)
-  )
-
-
-my_plot4 <- ggplot() +
-  
-  geom_point(data = data_across_subject4, 
-             aes(x = numerosity,
-                 y = mean_deviation,
-                 color = type,
-                 shape = protectzonetype),
-             position = position_dodge(0.5), 
-             stat = "identity", 
-             alpha = 0.8,
-             size = 5) +
-  
-  
-  geom_hline(yintercept = 0, linetype = "dashed") +
-  
-  geom_point(data = data_by_subject4, 
-             aes(x = numerosity,
-                 y = deviation,
-                 color = type,
-                 shape = protectzonetype),
-             position = position_dodge(0.5), 
-             stat = "identity", 
-             alpha = 0.2,
-             size = 3) +
-  
-  geom_errorbar(data = data_across_subject4, 
-                aes(x = numerosity,
-                    y = mean_deviation,
-                    ymin = mean_deviation - sem,
-                    ymax = mean_deviation + sem,
-                    group = interaction(protectzonetype, type)),  # Fixed column name
-                color = "black",
-                size  = 0.8,
-                width = .00,
-                position = position_dodge(0.5),
-                alpha = 0.5) +
-  
-  labs(y = "Deviation Score (DS)", x = "Set Size") +
-  
-  
-  theme(axis.title.x = element_text(color="black", size=14, face="bold"),
-        axis.title.y = element_text(color="black", size=14, face="bold"),
-        panel.border = element_blank(),  
-        # remove panel grid lines
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        # remove panel background
-        panel.background = element_blank(),
-        # add axis line
-        axis.line = element_line(colour = "grey"),
-        # x,y axis tick labels
-        axis.text.x = element_text(size = 12, face = "bold"),
-        axis.text.y = element_text(size = 12, face = "bold"),
-        # legend size
-        legend.title = element_text(size = 12, face = "bold"),
-        legend.text = element_text(size = 10),
-        # facet wrap title
-        strip.text.x = element_text(size = 12, face = "bold")) +
-  
-  facet_wrap(~left_right)
-
-
-my_plot4
-
-# ggsave(file = "plot_ds_leftright.svg", plot = my_plot4, width = 12, height = 5, units = "in")
-
-
-# -----8 locations---------------
-
-data <- data %>%
-  mutate(visual_field = case_when(
-    rotation_index %in% c(1, 2, 24)      ~ "right",
-    rotation_index %in% c(3, 4, 5)       ~ "upper_right",
-    rotation_index %in% c(6, 7, 8)       ~ "upper",
-    rotation_index %in% c(9, 10, 11)     ~ "upper_left",
-    rotation_index %in% c(12, 13, 14)    ~ "left",
-    rotation_index %in% c(15, 16, 17)    ~ "lower_left",
-    rotation_index %in% c(18, 19, 20)    ~ "lower",
-    rotation_index %in% c(21, 22, 23)    ~ "lower_right",
-    TRUE                                 ~ NA_character_
-  ))
-
-
-data_by_subject5 <- data %>% 
-  group_by(numerosity, type, participant, protectzonetype, visual_field) %>% 
-  summarise(
-    n = n(),
-    deviation = mean(deviation, na.rm = TRUE),
-    rt = mean(key_resp.rt),
-    .groups = 'drop'
-  )
-
-
-data_across_subject5 <- data_by_subject5 %>% 
-  group_by(numerosity, type, protectzonetype, visual_field) %>% 
-  summarise(
-    n = n(),
-    mean_deviation = mean(deviation, na.rm = TRUE),
-    sd_deviaiton = sd(deviation, na.rm = TRUE),
-    mean_rt = mean(rt, na.rm = TRUE),
-    sd_rt = sd(rt, na.rm = TRUE),
-    
-    .groups = 'drop'
-  ) %>% 
-  mutate(
-    sem = sd_deviaiton/sqrt(n),
-    ci = sem * qt(0.975, df = n - 1),
-    sem_rt = sd_rt/sqrt(n),
-    ci_rt = sem_rt * qt(0.975, df = n - 1)
-  )
-
-
-my_plot5 <- ggplot() +
-  
-  geom_point(data = data_across_subject5, 
-             aes(x = numerosity,
-                 y = mean_deviation,
-                 color = type,
-                 shape = protectzonetype),
-             position = position_dodge(0.5), 
-             stat = "identity", 
-             alpha = 0.8,
-             size = 5) +
-  
-  
-  geom_hline(yintercept = 0, linetype = "dashed") +
-  
-  geom_point(data = data_by_subject5, 
-             aes(x = numerosity,
-                 y = deviation,
-                 color = type,
-                 shape = protectzonetype),
-             position = position_dodge(0.5), 
-             stat = "identity", 
-             alpha = 0.2,
-             size = 3) +
-  
-  geom_errorbar(data = data_across_subject5, 
-                aes(x = numerosity,
-                    y = mean_deviation,
-                    ymin = mean_deviation - sem,
-                    ymax = mean_deviation + sem,
-                    group = interaction(protectzonetype, type)),  # Fixed column name
-                color = "black",
-                size  = 0.8,
-                width = .00,
-                position = position_dodge(0.5),
-                alpha = 0.5) +
-  
-  labs(y = "Deviation Score (DS)", x = "Set Size") +
-  
-  
-  theme(axis.title.x = element_text(color="black", size=14, face="bold"),
-        axis.title.y = element_text(color="black", size=14, face="bold"),
-        panel.border = element_blank(),  
-        # remove panel grid lines
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        # remove panel background
-        panel.background = element_blank(),
-        # add axis line
-        axis.line = element_line(colour = "grey"),
-        # x,y axis tick labels
-        axis.text.x = element_text(size = 12, face = "bold"),
-        axis.text.y = element_text(size = 12, face = "bold"),
-        # legend size
-        legend.title = element_text(size = 12, face = "bold"),
-        legend.text = element_text(size = 10),
-        # facet wrap title
-        strip.text.x = element_text(size = 12, face = "bold")) +
-  
-  facet_wrap(~visual_field)
-
-
-my_plot5
-
-# ggsave(file = "plot_ds_visual_field.svg", plot = my_plot5, width = 14, height =10, units = "in")
-
-
-
-# -----horizontal vs. vertical meridian---------------
-
-meridian_data <- data %>%
-  dplyr::filter( rotation_index %in% c(1, 13, 7 ,19)) %>% 
-
-  dplyr::mutate(meridian = case_when(
-    rotation_index %in% c(1, 13)   ~ "horizontal",
-    rotation_index %in% c(7, 19)~ "vertical"
-  ))
-
-
-data_by_subject6 <- meridian_data %>% 
-  group_by(numerosity, type, participant, protectzonetype, meridian) %>% 
-  summarise(
-    n = n(),
-    deviation = mean(deviation, na.rm = TRUE),
-    rt = mean(key_resp.rt),
-    .groups = 'drop'
-  )
-
-
-data_across_subject6 <- data_by_subject6 %>% 
-  group_by(numerosity, type, protectzonetype, meridian) %>% 
-  summarise(
-    n = n(),
-    mean_deviation = mean(deviation, na.rm = TRUE),
-    sd_deviaiton = sd(deviation, na.rm = TRUE),
-    mean_rt = mean(rt, na.rm = TRUE),
-    sd_rt = sd(rt, na.rm = TRUE),
-    
-    .groups = 'drop'
-  ) %>% 
-  mutate(
-    sem = sd_deviaiton/sqrt(n),
-    ci = sem * qt(0.975, df = n - 1),
-    sem_rt = sd_rt/sqrt(n),
-    ci_rt = sem_rt * qt(0.975, df = n - 1)
-  )
-
-
-my_plot6 <- ggplot() +
-  
-  geom_point(data = data_across_subject6, 
-             aes(x = numerosity,
-                 y = mean_deviation,
-                 color = type,
-                 shape = protectzonetype),
-             position = position_dodge(0.5), 
-             stat = "identity", 
-             alpha = 0.8,
-             size = 5) +
-  
-  
-  geom_hline(yintercept = 0, linetype = "dashed") +
-  
-  # geom_point(data = data_by_subject6, 
-  #            aes(x = numerosity,
-  #                y = deviation,
-  #                color = type,
-  #                shape = protectzonetype),
-  #            position = position_dodge(0.5), 
-  #            stat = "identity", 
-  #            alpha = 0.2,
-  #            size = 3) +
-  # 
-  geom_errorbar(data = data_across_subject6, 
-                aes(x = numerosity,
-                    y = mean_deviation,
-                    ymin = mean_deviation - sem,
-                    ymax = mean_deviation + sem,
-                    group = interaction(protectzonetype, type)),  # Fixed column name
-                color = "black",
-                size  = 0.8,
-                width = .00,
-                position = position_dodge(0.5),
-                alpha = 0.5) +
-  
-  scale_y_continuous(limits = c(-0.9, 1))+
-  
-  labs(y = "Deviation Score (DS)", x = "Set Size") +
-  
-  
-  theme(axis.title.x = element_text(color="black", size=14, face="bold"),
-        axis.title.y = element_text(color="black", size=14, face="bold"),
-        panel.border = element_blank(),  
-        # remove panel grid lines
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        # remove panel background
-        panel.background = element_blank(),
-        # add axis line
-        axis.line = element_line(colour = "grey"),
-        # x,y axis tick labels
-        axis.text.x = element_text(size = 12, face = "bold"),
-        axis.text.y = element_text(size = 12, face = "bold"),
-        # legend size
-        legend.title = element_text(size = 12, face = "bold"),
-        legend.text = element_text(size = 10),
-        # facet wrap title
-        strip.text.x = element_text(size = 12, face = "bold")) +
-  
-  facet_wrap(~meridian)
-
-
-my_plot6
-
-
-
-# ------------- coefficient of variation-------------------
-
-data_by_subject <- data %>% 
-  group_by(numerosity, type, participant, protectzonetype) %>% 
+  group_by(numerosity, configuration, participant, arrangement) %>% 
   summarise(
     n = n(),
     deviation = mean(deviation, na.rm = TRUE),
@@ -744,154 +91,429 @@ data_by_subject <- data %>%
     mean_reportedN = mean(reportedN, na.rm = TRUE),
     sd_reportedN = sd(reportedN, na.rm = TRUE),
     cv = sd_reportedN/mean_reportedN,
+    # weber fraction
+    weber_fraction = sd_reportedN / first(numerosity),
     .groups = 'drop'
   )
 
 
 data_across_subject <- data_by_subject %>% 
-  group_by(numerosity, type, protectzonetype) %>% 
+  group_by(numerosity, configuration, arrangement) %>% 
   summarise(
     n = n(),
     mean_deviation = mean(deviation, na.rm = TRUE),
     sd_deviaiton = sd(deviation, na.rm = TRUE),
     mean_rt = mean(rt, na.rm = TRUE),
     sd_rt = sd(rt, na.rm = TRUE),
-    # cv
+    
     mean_cv = mean(cv, na.rm = TRUE),
     sd_cv = sd(cv, na.rm = TRUE),
     
-    .groups = 'drop'
+    mean_weber_fraction = mean(weber_fraction, na.rm = TRUE),
+    sd_weber_fraction = sd(weber_fraction, na.rm = TRUE),
+    
+    .groups = "drop"
   ) %>% 
   mutate(
-    sem = sd_deviaiton/sqrt(n),
-    ci = sem * qt(0.975, df = n - 1),
+    sem_deviation = sd_deviaiton / sqrt(n),
+    ci_deviation = sem_deviation * qt(0.975, df = n - 1),
     
-    sem_rt = sd_rt/sqrt(n),
+    sem_rt = sd_rt / sqrt(n),
     ci_rt = sem_rt * qt(0.975, df = n - 1),
     
     sem_cv = sd_cv / sqrt(n),
-    ci_cv  = sem_cv * qt(0.975, df = n - 1)
+    ci_cv = sem_cv * qt(0.975, df = n - 1),
+    
+    sem_weber_fraction = sd_weber_fraction / sqrt(n),
+    ci_weber_fraction = sem_weber_fraction * qt(0.975, df = n - 1)
   )
 
 
-my_plot_cv <- ggplot() +
-  
-  geom_point(data = data_across_subject, 
-             aes(x = numerosity,
-                 y = mean_cv,
-                 color = type,
-                 shape = protectzonetype),
-             position = position_dodge(0.5), 
-             stat = "identity", 
-             alpha = 0.8,
-             size = 5) +
-  
-  
-  # geom_hline(yintercept = 0, linetype = "dashed") +
-  
-  # geom_point(data = data_by_subject, 
-  #            aes(x = numerosity,
-  #                y = cv,
-  #                color = type,
-  #                shape = protectzonetype),
-  #            position = position_dodge(0.5), 
-  #            stat = "identity", 
-  #            alpha = 0.2,
-  #            size = 3) +
-  
-  geom_errorbar(data = data_across_subject, 
-                aes(x = numerosity,
-                    y = mean_cv,
-                    ymin = mean_cv - sem_cv,
-                    ymax = mean_cv + sem_cv,
-                    group = interaction(protectzonetype, type)),  # Fixed column name
-                color = "black",
-                size  = 0.8,
-                width = .00,
-                position = position_dodge(0.5),
-                alpha = 0.5) +
-  
-  labs(y = "Coefficient of Variation (CV)", x = "Set Size") +
-  
-  scale_y_continuous(limits = c(0.1, 0.3))+
-  
-  
-  theme(axis.title.x = element_text(color="black", size=14, face="bold"),
-        axis.title.y = element_text(color="black", size=14, face="bold"),
-        panel.border = element_blank(),  
-        # remove panel grid lines
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        # remove panel background
-        panel.background = element_blank(),
-        # add axis line
-        axis.line = element_line(colour = "grey"),
-        # x,y axis tick labels
-        axis.text.x = element_text(size = 12, face = "bold"),
-        axis.text.y = element_text(size = 12, face = "bold"),
-        # legend size
-        legend.title = element_text(size = 12, face = "bold"),
-        legend.text = element_text(size = 10),
-        # facet wrap title
-        strip.text.x = element_text(size = 12, face = "bold"))
+my_plot_theme <- theme(
+  axis.title.x = element_text(color = "black", size = 14, face = "bold"),
+  axis.title.y = element_text(color = "black", size = 14, face = "bold"),
+  panel.border = element_blank(),
+  panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(),
+  panel.background = element_blank(),
+  axis.line = element_line(colour = "grey"),
+  axis.text.x = element_text(size = 12, face = "bold"),
+  axis.text.y = element_text(size = 12, face = "bold"),
+  legend.title = element_text(size = 12, face = "bold"),
+  legend.text = element_text(size = 12),
+  strip.text.x = element_text(size = 12, face = "bold"),
+  strip.text.y = element_text(size = 12, face = "bold")
+)
 
 
-my_plot_cv
+plot_deviation <- ggplot() + 
+  
+  geom_point(
+    data = data_across_subject,
+    aes(x = configuration,
+        y = mean_deviation,
+        color = arrangement,
+        shape = arrangement),
+
+    position = position_dodge(0.8),
+    stat = "identity",
+    size = 4,
+    alpha = 0.9) +
+  
+  # geom_boxplot(
+  #   data = data_by_subject,
+  #   aes(
+  #     x = configuration,
+  #     y = deviation,
+  #     color = arrangement,
+  #     group = interaction(configuration, arrangement)
+  #   ),
+  #   position = position_dodge2(width = 0.8, preserve = 'single'),
+  #   width = 0.6,
+  #   alpha = 0.6,
+  #   outlier.alpha = 0.3
+  # ) +
+  #     
+  
+  geom_half_violin(
+    data = data_by_subject,
+    aes(
+      x = configuration,
+      y = deviation,
+      fill = arrangement
+    ),
+    side = "l",
+    position = position_dodge(width = 0.8),
+    alpha = 0.3,
+    width = 1,
+    color = "white",
+    trim = FALSE
+    
+  ) +
+  geom_errorbar(
+    data = data_across_subject,
+    aes(
+      x = configuration,
+      y = mean_deviation,
+      ymin = mean_deviation - ci_deviation,
+      ymax = mean_deviation + ci_deviation,
+      group = arrangement
+    ),
+    position = position_dodge(width = 0.8),
+    stat = "identity",
+    width = 0,
+    color = "black",
+    size = 0.8,
+    alpha = 1
+  ) +
+  
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  facet_wrap(~ numerosity, 
+             scales = "free_x",
+             nrow = 1,
+             labeller = labeller(
+               numerosity = c(
+                 `3` = "Set size 3",
+                 `4` = "Set size 4",
+                 `5` = "Set size 5",
+                 `6` = "Set size 6"
+               )
+             )) +
+  
+  scale_color_manual(labels = c("radial", "tangential"),
+                     values = c("#BB5566", "#004488")) +
+  
+  scale_fill_manual(labels = c("radial", "tangential"),
+                     values = c("#BB5566", "#004488")) +
+  
+  scale_y_continuous(breaks = c(-2,-1,0,1,2), limits = c(-2, 2)) +
+  
+  labs(
+    x = "Configuration",
+    y = "Bias (deviaiton)"
+  ) +
+  my_plot_theme
+
+plot_deviation
+
+# ggsave(file = "plot_deviation.svg", plot = plot_deviation, width = 11.3, height = 3.4, units = "in")
+
+
+plot_cv <- ggplot() + 
+  
+  geom_point(
+    data = data_across_subject,
+    aes(x = configuration,
+        y = mean_cv,
+        color = arrangement,
+        shape = arrangement),
+    
+    position = position_dodge(0.8),
+    stat = "identity",
+    size = 4,
+    alpha = 0.9) +
+  
+  
+  geom_half_violin(
+    data = data_by_subject,
+    aes(
+      x = configuration,
+      y = cv,
+      fill = arrangement
+    ),
+    side = "l",
+    position = position_dodge(width = 0.8),
+    alpha = 0.3,
+    width = 1,
+    color = "white",
+    trim = FALSE
+    
+  ) +
+  geom_errorbar(
+    data = data_across_subject,
+    aes(
+      x = configuration,
+      y = mean_cv,
+      ymin = mean_cv - ci_cv,
+      ymax = mean_cv + ci_cv,
+      group = arrangement
+    ),
+    position = position_dodge(width = 0.8),
+    stat = "identity",
+    width = 0,
+    color = "black",
+    size = 0.8,
+    alpha = 1
+  ) +
+  
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  facet_wrap(~ numerosity, 
+             scales = "free_x",
+             nrow = 1,
+             labeller = labeller(
+               numerosity = c(
+                 `3` = "Set size 3",
+                 `4` = "Set size 4",
+                 `5` = "Set size 5",
+                 `6` = "Set size 6"
+               )
+             )) +
+  
+  scale_color_manual(labels = c("radial", "tangential"),
+                     values = c("#BB5566", "#004488")) +
+  
+  scale_fill_manual(labels = c("radial", "tangential"),
+                    values = c("#BB5566", "#004488")) +
+  
+  scale_y_continuous(breaks = c(0, 0.1, 0.2, 0.3, 0.4), limits = c(-0.01, 0.4)) +
+  
+  labs(
+    x = "Configuration",
+    y = "Precision (coefficient of variation)"
+  ) +
+  my_plot_theme
+
+plot_cv
+
+# ggsave(file = "plot_cv.svg", plot = plot_cv, width = 11.3, height = 3.4, units = "in")
+
+
+# the same plot collapse configuration
+
+data_by_subject2 <- data %>% 
+  group_by(numerosity, participant, arrangement) %>% 
+  summarise(
+    n = n(),
+    deviation = mean(deviation, na.rm = TRUE),
+    rt = mean(key_resp.rt),
+    # cv
+    mean_reportedN = mean(reportedN, na.rm = TRUE),
+    sd_reportedN = sd(reportedN, na.rm = TRUE),
+    cv = sd_reportedN/mean_reportedN,
+    # weber fraction
+    weber_fraction = sd_reportedN / first(numerosity),
+    .groups = 'drop'
+  )
+
+
+data_across_subject2 <- data_by_subject2 %>% 
+  group_by(numerosity, arrangement) %>% 
+  summarise(
+    n = n(),
+    mean_deviation = mean(deviation, na.rm = TRUE),
+    sd_deviaiton = sd(deviation, na.rm = TRUE),
+    mean_rt = mean(rt, na.rm = TRUE),
+    sd_rt = sd(rt, na.rm = TRUE),
+    
+    mean_cv = mean(cv, na.rm = TRUE),
+    sd_cv = sd(cv, na.rm = TRUE),
+    
+    mean_weber_fraction = mean(weber_fraction, na.rm = TRUE),
+    sd_weber_fraction = sd(weber_fraction, na.rm = TRUE),
+    
+    .groups = "drop"
+  ) %>% 
+  mutate(
+    sem_deviation = sd_deviaiton / sqrt(n),
+    ci_deviation = sem_deviation * qt(0.975, df = n - 1),
+    
+    sem_rt = sd_rt / sqrt(n),
+    ci_rt = sem_rt * qt(0.975, df = n - 1),
+    
+    sem_cv = sd_cv / sqrt(n),
+    ci_cv = sem_cv * qt(0.975, df = n - 1),
+    
+    sem_weber_fraction = sd_weber_fraction / sqrt(n),
+    ci_weber_fraction = sem_weber_fraction * qt(0.975, df = n - 1)
+  )
+
+
+plot_deviation <- ggplot() + 
+  
+  geom_point(
+    data = data_across_subject2,
+    aes(x = as.factor(numerosity),
+        y = mean_deviation,
+        color = arrangement,
+        shape = arrangement),
+    
+    position = position_dodge(0.8),
+    stat = "identity",
+    size = 4,
+    alpha = 0.9) +
+  
+  geom_half_violin(
+    
+    data = data_by_subject2,
+    aes(
+      x = as.factor(numerosity),
+      y = deviation,
+      fill = arrangement,
+    ),
+    side = "l",
+    position = position_dodge(width = 0.8),
+    alpha = 0.3,
+    width = 1,
+    color = "white",
+    trim = FALSE
+    
+  ) +
+  
+  geom_errorbar(
+    data = data_across_subject2,
+    aes(
+      x = as.factor(numerosity),
+      y = mean_deviation,
+      ymin = mean_deviation - ci_deviation,
+      ymax = mean_deviation + ci_deviation,
+      group = arrangement
+    ),
+    position = position_dodge(width = 0.8),
+    stat = "identity",
+    width = 0,
+    color = "black",
+    size = 0.8,
+    alpha = 1
+  ) +
+  
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  
+  scale_color_manual(labels = c("radial", "tangential"),
+                     values = c("#BB5566", "#004488")) +
+  
+  scale_fill_manual(labels = c("radial", "tangential"),
+                    values = c("#BB5566", "#004488")) +
+  
+  scale_y_continuous(breaks = c(-2,-1,0,1,2), limits = c(-2, 2)) +
+  
+  labs(
+    x = "Set size",
+    y = "Bias (deviaiton)"
+  ) +
+  my_plot_theme
+
+plot_deviation
+
+# ggsave(file = "plot_deviation2.svg", plot = plot_deviation, width = 8, height = 3.4, units = "in")
+
+plot_cv <- ggplot() + 
+  
+  geom_point(
+    data = data_across_subject2,
+    aes(x = as.factor(numerosity),
+        y = mean_cv,
+        color = arrangement,
+        shape = arrangement),
+    
+    position = position_dodge(0.8),
+    stat = "identity",
+    size = 4,
+    alpha = 0.9) +
+  
+  geom_half_violin(
+    
+    data = data_by_subject2,
+    aes(
+      x = as.factor(numerosity),
+      y = cv,
+      fill = arrangement,
+    ),
+    side = "l",
+    position = position_dodge(width = 0.8),
+    alpha = 0.3,
+    width = 1,
+    color = "white",
+    trim = FALSE
+    
+  ) +
+  
+  geom_errorbar(
+    data = data_across_subject2,
+    aes(
+      x = as.factor(numerosity),
+      y = mean_cv,
+      ymin = mean_cv - ci_cv,
+      ymax = mean_cv + ci_cv,
+      group = arrangement
+    ),
+    position = position_dodge(width = 0.8),
+    stat = "identity",
+    width = 0,
+    color = "black",
+    size = 0.8,
+    alpha = 1
+  ) +
+  
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  
+  scale_color_manual(labels = c("radial", "tangential"),
+                     values = c("#BB5566", "#004488")) +
+  
+  scale_fill_manual(labels = c("radial", "tangential"),
+                    values = c("#BB5566", "#004488")) +
+  
+  scale_y_continuous(breaks = c(0, 0.1, 0.2, 0.3, 0.4), limits = c(-0.01, 0.4)) +
+  
+  labs(
+    x = "Set size",
+    y = "Precision (coefficient of variation)"
+  ) +
+  my_plot_theme
+
+plot_cv
+
+# ggsave(file = "plot_cv2.svg", plot = plot_cv, width = 8, height = 3.4, units = "in")
 
 
 # ===================LMM ==============
 
-# data clean - for model - contrast coded (type as factor)
+# data clean - for model - contrast coded 
+
 data_clean <- data %>%
-  filter(
-    !is.na(deviation),
-    !is.na(protectzonetype),
-    !is.na(type),
-    !is.na(participant),
-    !is.na(key_resp.rt)
-  ) %>%
   mutate(
     participant = as.factor(participant),  
     numerosity  = as.factor(numerosity),
-    protectzonetype = as.factor(protectzonetype),
-    type = as.factor(type)
-  )
-
-# contrast coding
-data_clean <- data_clean %>%
-  mutate(
-    arrangement_c = ifelse(protectzonetype == "radial", -0.5, 0.5)
-  )
-
-# check contrast coding
-data_clean %>% 
-  distinct(protectzonetype, arrangement_c)
-
-
-data_clean <- data_clean %>%
-  mutate(
-    type_mixed_vs_uniform = ifelse(type == "both", -2/3, 1/3),
-    type_close_vs_far     = case_when(
-      type == "close" ~ -0.5,
-      type == "far"   ~  0.5,
-      TRUE            ~  0
-    )
-  )
-
-# data clean - for model - contrast coded (only eccentricity)
-
-data_clean <- data %>%
-  filter(
-    !is.na(deviation),
-    !is.na(protectzonetype),
-    !is.na(type),
-    !is.na(participant),
-    !is.na(key_resp.rt)
-  ) %>%
-  mutate(
-    participant = as.factor(participant),  
-    numerosity  = as.factor(numerosity),
-    protectzonetype = as.factor(protectzonetype)
+    arrangement = as.factor(arrangement)
   )
 
 # contrast coding
@@ -901,129 +523,131 @@ data_clean <- data_clean %>%
   )
 
 
+# model comparison within each set size dv
+m_ss4_full <- lme4::lmer(deviation ~ configuration * arrangement + 
+                     (1 + arrangement | participant),
+                   data = data_clean %>% filter(numerosity == 4))
 
-# LMM----type
-lmm_dv <- lme4::lmer(
-  deviation ~ arrangement_c * numerosity + type  + (1 + arrangement_c|participant),
+m_ss4_reduced <- lme4::lmer(deviation ~ configuration + arrangement + 
+                        (1 + arrangement | participant),
+                      data = data_clean %>% filter(numerosity == 4))
+
+anova(m_ss4_reduced, m_ss4_full)
+
+
+m_ss5_full <- lme4::lmer(deviation ~ configuration * arrangement + 
+                           (1 + arrangement | participant),
+                         data = data_clean %>% filter(numerosity == 5))
+
+m_ss5_reduced <- lme4::lmer(deviation ~ configuration + arrangement + 
+                              (1 + arrangement | participant),
+                            data = data_clean %>% filter(numerosity == 5))
+
+anova(m_ss5_reduced, m_ss5_full)
+
+
+# LMM DV
+lmm_dv_main <- lme4::lmer(
+  deviation ~ arrangement_c * numerosity   + (1 + arrangement_c|participant),
   data = data_clean
 )
 
 lmm_dv2 <- lme4::lmer(
-  deviation ~ arrangement_c + numerosity + type + (1 + arrangement_c|participant),
+  deviation ~ arrangement_c + numerosity + (1 + arrangement_c|participant),
   data = data_clean
 )
 
-anova(lmm_dv, lmm_dv2)
+anova(lmm_dv_main, lmm_dv2)
 
-summary(lmm_dv)
 
 sjPlot::tab_model(
-  lmm_dv,
+  lmm_dv_main,
   p.style = 'scientific_stars',
   show.se = T,
   show.stat = T,
   digits = 3)
 
-emm <- emmeans::emmeans(
-  lmm_dv,
-  ~ protectzonetype | numerosity)
 
-emm
+emm_arr_by_num  <- emmeans::emmeans(
+  lmm_dv_main,
+  ~ arrangement_c | numerosity)
 
-contrast_ref <- emmeans::contrast(
+emm_arr_by_num 
+
+arrangement_contrasts  <- emmeans::contrast(
   emm,
   method = "pairwise",
   adjust = "holm"  
 )
-contrast_ref
-
-emmeans::emmeans(lmm_dv, pairwise ~ type+numerosity)
+arrangement_contrasts 
 
 
+# model comparison within each set size cv
 
-cv_by_subject <- data_clean %>%
-  group_by(participant, protectzonetype, numerosity, type) %>%
-  summarise(
-    n_trials = n(),
-    mean_reported = mean(reportedN, na.rm = TRUE),
-    sd_reported   = sd(reportedN, na.rm = TRUE),
-    CV = sd_reported / mean_reported,
-    .groups = 'drop'
-  ) %>%
-  filter(n_trials >= 5) 
 
-lmm_cv <- lme4::lmer(
-  CV ~ protectzonetype * numerosity + type +
-    (1 + protectzonetype | participant),
-  data = cv_by_subject
+m_ss4_full <- lme4::lmer(cv ~ configuration * arrangement + 
+                           (1 + arrangement | participant),
+                         data = data_by_subject %>% filter(numerosity == 4))
+
+m_ss4_reduced <- lme4::lmer(cv ~ configuration + arrangement + 
+                              (1 + arrangement | participant),
+                            data = data_by_subject %>% filter(numerosity == 4))
+
+anova(m_ss4_reduced, m_ss4_full)
+
+
+m_ss5_full <- lme4::lmer(cv ~ configuration * arrangement + 
+                           (1 + arrangement | participant),
+                         data = data_by_subject %>% filter(numerosity == 5))
+
+m_ss5_reduced <- lme4::lmer(cv ~ configuration + arrangement + 
+                              (1 + arrangement | participant),
+                            data = data_by_subject %>% filter(numerosity == 5))
+
+anova(m_ss5_reduced, m_ss5_full)
+
+
+# LMM cv
+
+# contrast coding
+data_by_subject <- data_by_subject %>%
+  mutate(
+    numerosity = as.factor(numerosity),
+    arrangement_c = ifelse(arrangement == "radial", -0.5, 0.5)
+  )
+
+
+lmm_cv_main <- lme4::lmer(
+  cv ~ arrangement_c* numerosity   + (1 + arrangement_c|participant),
+  data = data_by_subject
 )
-summary(lmm_cv)
+
+lmm_cv2 <- lme4::lmer(
+  cv ~ arrangement_c+ numerosity + (1 + arrangement_c|participant),
+  data = data_by_subject
+)
+
+
+anova(lmm_cv_main, lmm_cv2)
 
 
 sjPlot::tab_model(
-  lmm_cv,
+  lmm_cv_main,
   p.style = 'scientific_stars',
   show.se = T,
   show.stat = T,
   digits = 3)
 
 
-emmeans::emmeans(lmm_cv, pairwise ~ protectzonetype | numerosity)
+emm_arr_by_num  <- emmeans::emmeans(
+  lmm_cv_main,
+  ~ arrangement_c | numerosity)
 
+emm_arr_by_num 
 
-# ==================eccentricity======================
-
-# eccentricity distribution
-my_plot_ecc <- ggplot(data, 
-                      aes(x = avg_ecc, 
-                          color = protectzonetype)) +
-  
-  geom_density(linewidth = 0.8, alpha = 0.8) +
-  
-  facet_wrap(~ numerosity, ncol = 4, 
-             labeller = labeller(numerosity = function(x) paste("Set Size", x))) +
-  
-  labs(x = "Avearge Eccentricity (°)", 
-       y = "Density",
-       color = "Arrangement") +
-  
-  theme(axis.title.x = element_text(color="black", size=14, face="bold"),
-        axis.title.y = element_text(color="black", size=14, face="bold"),
-        panel.border = element_blank(),  
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        panel.background = element_blank(),
-        axis.line = element_line(colour = "grey"),
-        axis.text.x = element_text(size = 12, face = "bold"),
-        axis.text.y = element_text(size = 12, face = "bold"),
-        legend.title = element_text(size = 12, face = "bold"),
-        legend.text = element_text(size = 10),
-        strip.text.x = element_text(size = 12, face = "bold"))
-
-my_plot_ecc
-
-
-#-----------lmm no type be avergae eccentricity--------
-
-lmm_dv <- lme4::lmer(
-  deviation ~ arrangement_c * numerosity + avg_ecc  + (1 + arrangement_c|participant),
-  data = data_clean
+arrangement_contrasts  <- emmeans::contrast(
+  emm,
+  method = "pairwise",
+  adjust = "holm"  
 )
-
-lmm_dv2 <- lme4::lmer(
-  deviation ~ arrangement_c + numerosity + avg_ecc + (1 + arrangement_c|participant),
-  data = data_clean
-)
-
-anova(lmm_dv, lmm_dv2)
-
-summary(lmm_dv)
-
-sjPlot::tab_model(
-  lmm_dv,
-  p.style = 'scientific_stars',
-  show.se = T,
-  show.stat = T,
-  digits = 3)
-
-
+arrangement_contrasts 
