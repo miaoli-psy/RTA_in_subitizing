@@ -236,6 +236,7 @@ plot_deviation <- ggplot() +
 
 plot_deviation
 
+
 # ggsave(file = "plot_deviation.svg", plot = plot_deviation, width = 11.3, height = 3.4, units = "in")
 
 
@@ -366,6 +367,7 @@ data_across_subject2 <- data_by_subject2 %>%
     sem_weber_fraction = sd_weber_fraction / sqrt(n),
     ci_weber_fraction = sem_weber_fraction * qt(0.975, df = n - 1)
   )
+
 
 
 plot_deviation <- ggplot() + 
@@ -524,6 +526,36 @@ data_clean <- data_clean %>%
 
 
 # model comparison within each set size dv
+
+m_ss3_full <- lme4::lmer(deviation ~ configuration * arrangement + 
+                           (1 + arrangement | participant),
+                         data = data_clean %>% filter(numerosity == 3))
+
+m_ss3_reduced <- lme4::lmer(deviation ~ configuration + arrangement + 
+                              (1 + arrangement | participant),
+                            data = data_clean %>% filter(numerosity == 3))
+
+anova(m_ss3_reduced, m_ss3_full)
+
+
+emm  <- emmeans::emmeans(
+  m_ss3_full,
+  ~ arrangement | configuration)
+
+emm 
+
+contrasts  <- emmeans::contrast(
+  emm,
+  method = "pairwise",
+  adjust = "holm"  
+)
+contrasts 
+
+
+
+
+
+
 m_ss4_full <- lme4::lmer(deviation ~ configuration * arrangement + 
                      (1 + arrangement | participant),
                    data = data_clean %>% filter(numerosity == 4))
@@ -560,6 +592,7 @@ lmm_dv2 <- lme4::lmer(
 anova(lmm_dv_main, lmm_dv2)
 
 
+
 sjPlot::tab_model(
   lmm_dv_main,
   p.style = 'scientific_stars',
@@ -575,7 +608,7 @@ emm_arr_by_num  <- emmeans::emmeans(
 emm_arr_by_num 
 
 arrangement_contrasts  <- emmeans::contrast(
-  emm,
+  emm_arr_by_num,
   method = "pairwise",
   adjust = "holm"  
 )
@@ -583,6 +616,16 @@ arrangement_contrasts
 
 
 # model comparison within each set size cv
+
+m_ss3_full <- lme4::lmer(cv ~ configuration * arrangement + 
+                           (1 + arrangement | participant),
+                         data = data_by_subject %>% filter(numerosity == 3))
+
+m_ss3_reduced <- lme4::lmer(cv ~ configuration + arrangement + 
+                              (1 + arrangement | participant),
+                            data = data_by_subject %>% filter(numerosity == 3))
+
+anova(m_ss3_reduced, m_ss3_full)
 
 
 m_ss4_full <- lme4::lmer(cv ~ configuration * arrangement + 
@@ -632,7 +675,7 @@ anova(lmm_cv_main, lmm_cv2)
 
 
 sjPlot::tab_model(
-  lmm_cv_main,
+  lmm_cv2,
   p.style = 'scientific_stars',
   show.se = T,
   show.stat = T,
@@ -646,8 +689,9 @@ emm_arr_by_num  <- emmeans::emmeans(
 emm_arr_by_num 
 
 arrangement_contrasts  <- emmeans::contrast(
-  emm,
+  emm_arr_by_num,
   method = "pairwise",
   adjust = "holm"  
 )
 arrangement_contrasts 
+
