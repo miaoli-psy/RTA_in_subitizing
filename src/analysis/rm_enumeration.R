@@ -194,6 +194,96 @@ plot_prop_correct <- ggplot() +
 plot_prop_correct
 
 
+# # proportion correct at different visual field
+# 
+# prop_correct_by_parti2 <- data %>% 
+#   group_by(participant, numerosity, arrangement, rotation_index) %>% 
+#   summarise(
+#     prop_correct = mean(reportedN == numerosity, na.rm = TRUE),
+#     .groups = "drop"
+#   )
+# 
+# 
+# prop_correct_across_parti2 <- prop_correct_by_parti2 %>% 
+#   group_by(numerosity, arrangement, rotation_index) %>% 
+#   summarise(
+#     avg_prop_correct = mean(prop_correct),
+#     sd = sd(prop_correct),
+#     n = n(),
+#     .groups = "drop"
+#   ) %>% 
+#   mutate(
+#     sem = sd/sqrt(n),
+#     ci =qt(0.975,(n-1)) * sem
+#   )
+# 
+# 
+# 
+# plot_prop_correct2 <- ggplot() + 
+#   
+#   geom_point(
+#     data = prop_correct_across_parti2,
+#     aes(x = numerosity,
+#         y = avg_prop_correct,
+#         color = arrangement,
+#         shape = arrangement),
+#     
+#     position = position_dodge(0.8),
+#     stat = "identity",
+#     size = 4,
+#     alpha = 0.9) +
+#   
+#   geom_errorbar(
+#     data = prop_correct_across_parti2,
+#     aes(
+#       x = numerosity,
+#       y = avg_prop_correct,
+#       ymin = avg_prop_correct - ci,
+#       ymax = avg_prop_correct + ci,
+#       group = arrangement
+#     ),
+#     position = position_dodge(width = 0.8),
+#     stat = "identity",
+#     width = 0,
+#     color = "black",
+#     size = 0.8,
+#     alpha = 1
+#   ) +
+#   
+#   geom_line(
+#     data = prop_correct_across_parti2,
+#     aes(x = numerosity,
+#         y = avg_prop_correct,
+#         color = arrangement),
+#     
+#     position = position_dodge(0.8),
+#     stat = "identity",
+#     size = 1,
+#     alpha = 0.9
+#   ) +
+#   
+#   geom_hline(yintercept = 1, linetype = "dashed") +
+#   
+#   
+#   scale_color_manual(labels = c("radial", "tangential"),
+#                      values = c("#BB5566", "#004488")) +
+#   
+#   
+#   scale_y_continuous(breaks = c(0, 0.2, 0.4, 0.6, 0.8, 1), limits = c(0, 1)) +
+#   
+#   labs(
+#     x = "Set size",
+#     y = "Propotion correct"
+#     
+#   ) +
+#   my_plot_theme+
+#   
+#   facet_wrap(~rotation_index)
+# 
+# plot_prop_correct2
+
+
+
 # ----deviation and cv --------------
 
 data_by_subject <- data %>% 
