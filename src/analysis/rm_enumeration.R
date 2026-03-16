@@ -78,6 +78,121 @@ data <- data %>%
 # data %>%
 #   count(numerosity, type, configuration, sort = TRUE)
 
+# error distribution----------------
+
+error_distri <- ggplot() +
+  
+  geom_histogram(
+    data = data,
+    aes(x = deviation, 
+        colour = arrangement, 
+        fill = arrangement),
+    stat = "bin",
+    binwidth = 0.5,
+    boundary = -0.5,
+    alpha = 0.2,
+    position = position_dodge(width = 0.5)
+  )+
+  facet_wrap(~ numerosity, nrow = 1) +
+  
+  scale_x_continuous(breaks = c(-3, -2, -1, 0, 1, 2 ,3), limits = c(-3.5, 3.5)) +
+  
+  labs(
+    x = "Deviation",
+    y = "Count") +
+  
+  scale_fill_manual(labels = c("radial", "tangential"),
+                    values = c("#BB5566", "#004488")) +
+  
+  my_plot_theme
+
+error_distri
+
+
+# proportion correct
+
+prop_correct_by_parti <- data %>% 
+  group_by(participant, numerosity, arrangement) %>% 
+  summarise(
+    prop_correct = mean(reportedN == numerosity, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+
+prop_correct_across_parti <- prop_correct_by_parti %>% 
+  group_by(numerosity, arrangement) %>% 
+  summarise(
+    avg_prop_correct = mean(prop_correct),
+    sd = sd(prop_correct),
+    n = n()
+  ) %>% 
+  mutate(
+    sem = sd/sqrt(n),
+    ci =qt(0.975,(n-1)) * sem
+  )
+        
+
+plot_prop_correct <- ggplot() + 
+  
+  geom_point(
+    data = prop_correct_across_parti,
+    aes(x = numerosity,
+        y = avg_prop_correct,
+        color = arrangement,
+        shape = arrangement),
+    
+    position = position_dodge(0.8),
+    stat = "identity",
+    size = 4,
+    alpha = 0.9) +
+  
+  geom_errorbar(
+    data = prop_correct_across_parti,
+    aes(
+      x = numerosity,
+      y = avg_prop_correct,
+      ymin = avg_prop_correct - ci,
+      ymax = avg_prop_correct + ci,
+      group = arrangement
+    ),
+    position = position_dodge(width = 0.8),
+    stat = "identity",
+    width = 0,
+    color = "black",
+    size = 0.8,
+    alpha = 1
+  ) +
+  
+  geom_line(
+    data = prop_correct_across_parti,
+    aes(x = numerosity,
+        y = avg_prop_correct,
+        color = arrangement),
+    
+    position = position_dodge(0.8),
+    stat = "identity",
+    size = 1,
+    alpha = 0.9
+  ) +
+  
+  geom_hline(yintercept = 1, linetype = "dashed") +
+  
+  
+  scale_color_manual(labels = c("radial", "tangential"),
+                     values = c("#BB5566", "#004488")) +
+  
+  
+  scale_y_continuous(breaks = c(0, 0.2, 0.4, 0.6, 0.8, 1), limits = c(0, 1)) +
+  
+  labs(
+    x = "Set size",
+    y = "Propotion correct"
+    
+  ) +
+  my_plot_theme
+
+plot_prop_correct
+
 
 # ----deviation and cv --------------
 
@@ -694,4 +809,11 @@ arrangement_contrasts  <- emmeans::contrast(
   adjust = "holm"  
 )
 arrangement_contrasts 
+
+
+
+
+
+
+
 
