@@ -39,6 +39,24 @@ mean(data$age)
 
 # add column configuration
 
+my_plot_theme <- theme(
+  axis.title.x = element_text(color = "black", size = 14, face = "bold", margin = margin(t = 10)),
+  axis.title.y = element_text(color = "black", size = 14, face = "bold", margin = margin(r = 10)),
+  axis.text.x  = element_text(size = 12, face = "bold", color = "black"),
+  axis.text.y  = element_text(size = 12, face = "bold", color = "black"),
+  axis.line    = element_line(colour = "black", linewidth = 0.8),
+  panel.border     = element_blank(),
+  panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(),
+  panel.background = element_blank(),
+  strip.text       = element_text(size = 12, face = "bold"),
+  legend.title     = element_text(size = 12, face = "bold"),
+  legend.text      = element_text(size = 10),
+  plot.title       = element_text(size = 16, face = "bold"),
+  plot.subtitle    = element_text(size = 12, color = "grey30"),
+  panel.spacing    = unit(1.5, "lines")
+)
+
 data <- data %>%
   mutate(
     numerosity = as.numeric(numerosity),
@@ -282,6 +300,141 @@ plot_prop_correct
 # 
 # plot_prop_correct2
 
+
+# -----BIS trade-off accuracy - RT
+
+data <- data %>% 
+  mutate(
+    correct = case_when(
+      deviation == 0 ~ 1,
+      TRUE ~0
+    )
+  )
+
+
+data_bis <- data %>%
+  mutate(
+    correct = ifelse(deviation == 0, 1, 0)
+  ) %>%
+  group_by(participant) %>%
+  mutate(
+    rt_mean = mean(key_resp.rt, na.rm = TRUE),
+    rt_sd = sd(key_resp.rt, na.rm = TRUE),
+    rt_keep = key_resp.rt >= rt_mean - 3 * rt_sd &
+      key_resp.rt <= rt_mean + 3 * rt_sd
+  ) %>%
+  ungroup() %>%
+  filter(rt_keep) %>%
+  group_by(participant, numerosity, arrangement) %>%
+  summarise(
+    accuracy = mean(correct, na.rm = TRUE),
+    mean_rt_correct = if (sum(correct, na.rm = TRUE) > 0) {
+      mean(key_resp.rt[correct == 1], na.rm = TRUE)
+    } else {
+      NA_real_
+    },
+    n_trials = n(),
+    n_correct = sum(correct, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  filter(!is.na(mean_rt_correct)) %>%
+  mutate(
+    z_accuracy = (accuracy - mean(accuracy, na.rm = TRUE)) / sd(accuracy, na.rm = TRUE),
+    z_rt = (mean_rt_correct - mean(mean_rt_correct, na.rm = TRUE)) / sd(mean_rt_correct, na.rm = TRUE),
+    BIS = z_accuracy - z_rt
+  )
+
+
+
+# removed trials
+data_bis_prefilter <- data %>%
+  mutate(
+    correct = ifelse(deviation == 0, 1, 0)
+  ) %>%
+  group_by(participant) %>%
+  mutate(
+    rt_mean = mean(key_resp.rt, na.rm = TRUE),
+    rt_sd = sd(key_resp.rt, na.rm = TRUE),
+    rt_keep = key_resp.rt >= rt_mean - 3 * rt_sd &
+      key_resp.rt <= rt_mean + 3 * rt_sd
+  ) %>%
+  ungroup()
+n_total <- nrow(data_bis_prefilter)
+n_removed <- sum(!data_bis_prefilter$rt_keep, na.rm = TRUE)
+pct_removed <- round(n_removed / n_total * 100, 2)
+
+data_bis_across_subjects <- data_bis %>% 
+  group_by(numerosity, arrangement) %>% 
+  summarise(
+    mean_BIS = mean(BIS),
+    sd = sd(BIS),
+    n = n(),
+    .groups = "drop"
+  ) %>% 
+  mutate(
+    sem = sd/sqrt(n),
+    ci =qt(0.975,(n-1)) * sem
+  )
+  
+
+plot_BIS <- ggplot() + 
+  
+  geom_point(
+    data = data_bis_across_subjects,
+    aes(x = numerosity,
+        y = mean_BIS,
+        color = arrangement,
+        shape = arrangement),
+    
+    position = position_dodge(0.8),
+    stat = "identity",
+    size = 4,
+    alpha = 0.9) +
+  
+  geom_errorbar(
+    data = data_bis_across_subjects,
+    aes(
+      x = numerosity,
+      y = mean_BIS,
+      ymin = mean_BIS - ci,
+      ymax = mean_BIS + ci,
+      group = arrangement
+    ),
+    position = position_dodge(width = 0.8),
+    stat = "identity",
+    width = 0,
+    color = "black",
+    size = 0.8,
+    alpha = 1
+  ) +
+  
+  geom_line(
+    data = data_bis_across_subjects,
+    aes(x = numerosity,
+        y = mean_BIS,
+        color = arrangement),
+    
+    position = position_dodge(0.8),
+    stat = "identity",
+    size = 1,
+    alpha = 0.9
+  ) +
+  
+  scale_color_manual(labels = c("radial", "tangential"),
+                     values = c("#BB5566", "#004488")) +
+
+  # scale_y_continuous(breaks = c(0, 0.2, 0.4, 0.6, 0.8, 1), limits = c(0, 1)) +
+  
+  labs(
+    x = "Set size",
+    y = "Efficiency (BIS)"
+    
+  ) +
+  my_plot_theme
+
+plot_BIS
+
+# ggsave(file = "plot_BIS.svg", plot = plot_BIS, width = 3.5, height = 3.4, units = "in")
 
 
 # ----deviation and cv --------------
@@ -900,10 +1053,44 @@ arrangement_contrasts  <- emmeans::contrast(
 )
 arrangement_contrasts 
 
+# LMM BIS
+
+data_bis <- data_bis %>%
+  mutate(
+    numerosity = as.factor(numerosity),
+    arrangement_c = ifelse(arrangement == "radial", -0.5, 0.5)
+  )
 
 
+lmm_bis <- lme4::lmer(
+  BIS ~ arrangement_c * numerosity + (1| participant),
+  data = data_bis
+)
+
+lmm_bis2 <- lme4::lmer(
+  BIS ~ arrangement_c + numerosity + (1 | participant),
+  data = data_bis
+)
+
+anova(lmm_bis, lmm_bis2)
+
+sjPlot::tab_model(
+  lmm_bis2,
+  p.style = 'scientific_stars',
+  show.se = T,
+  show.stat = T,
+  digits = 3)
+
+emm_arr_by_num <- emmeans::emmeans(
+  lmm_bis,
+  ~ arrangement_c | numerosity)
 
 
-
+arrangement_contrasts <- emmeans::contrast(
+  emm_arr_by_num,
+  method = "pairwise",
+  adjust = "holm"
+)
+arrangement_contrasts
 
 
